@@ -5,7 +5,7 @@ VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PlatformDevEmulator", "PlatformDevEmulator.vcxproj", "{9007C103-6E70-4A99-9397-7F9284AADFC1}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "glfw", "..\GLFW\src\glfw.vcxproj", "{A3FFF93D-3CE2-4298-8E73-9A392D24B51C}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "glfw", "..\..\GLFW\src\glfw.vcxproj", "{A3FFF93D-3CE2-4298-8E73-9A392D24B51C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

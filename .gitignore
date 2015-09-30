@@ -1,3 +1,6 @@
+# Project Specific
+Emulator/c8games/*
+
 # Compiled Object files
 *.slo
 *.lo
