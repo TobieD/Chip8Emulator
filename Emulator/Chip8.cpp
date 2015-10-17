@@ -2,17 +2,20 @@
 #include <fstream>
 #include <iostream>
 #include <chrono>
+#include <sstream>
+
 
 using namespace std;
 
 Chip8::Chip8(int screenWidth, int screenHeight) :
 	m_ScreenWidth(screenWidth),
-	m_ScreenHeight(screenHeight),	
+	m_ScreenHeight(screenHeight),
 	m_MemoryPosition(0x200),
 	m_StackIndex(0),
 	m_RegisterIIndex(0),
 	m_bGameLoaded(false),
-	m_bShouldDraw(false)
+	m_bShouldDraw(false),
+	m_RunSpeed(1)
 {
 
 }
@@ -40,13 +43,41 @@ void Chip8::Initialize()
 	m_RegisterIIndex = 0;
 	m_StackIndex = 0;
 
+	//load font set
+	U8 fonts[80] =
+	{	
+		0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+		0x20, 0x60, 0x20, 0x20, 0x70, // 1
+		0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+		0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+		0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+		0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+		0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+		0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+		0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+		0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+		0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+		0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+		0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+		0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+		0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+		0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+	};
+
+	
 	//clear memory
 	for (int i = 0; i < 4096; ++i)
 		m_Memory[i] = 0;
 
+	for (int i = 0; i < 80; i++)
+	{
+		m_Memory[i] = fonts[i];
+	}
+
+
 	//Clear registers
 	for (int i = 0; i < 16; ++i)
-		m_RegisterI[i]  = 0;
+		m_RegisterI[i] = 0;
 
 	//Clear keys
 	for (int i = 0; i < 16; ++i)
@@ -55,17 +86,23 @@ void Chip8::Initialize()
 	//Clear stack
 	for (int i = 0; i < 16; ++i)
 		m_Stack[i] = 0;
-	
+
 	//Reset Screen
 	for (int i = 0; i < m_ScreenWidth * m_ScreenHeight; i++)
-		m_Screen[i] = 0; //clear to white	
-	
+		m_Screen[i] = 0; //clear to white
+
+	//reset Delay Timer
+	m_DelayTimer = 0;
+	m_SoundTimer = 0;
+
 	//redraw screen
 	m_bShouldDraw = true;
-	m_bGameLoaded = false;
+	m_bGameLoaded = true;
 
 	//seed random for true random numbers
 	srand(static_cast<unsigned int>(time(nullptr)));
+
+	m_SoundTimer = 5;
 }
 
 void Chip8::Run()
@@ -77,11 +114,22 @@ void Chip8::Run()
 	//Reset drawing flag
 	m_bShouldDraw = false;
 
-	int runspeed = 600;
-	for (int i = 0; i < runspeed; i++)
+	for (int i = 0; i < m_RunSpeed; i++)
 	{
 		FetchOpcode();
 		ExecuteOpcode();
+
+		//update Timer
+		if (m_DelayTimer > 0)
+			m_DelayTimer--;
+
+		//update sound timer
+		if (m_SoundTimer > 0)
+		{
+			if (m_SoundTimer == 1)
+				cout << "\a" << endl; //play system beep
+			m_SoundTimer--;
+		}
 	}
 
 }
@@ -100,6 +148,8 @@ void Chip8::FetchOpcode()
 
 	//read next byte in memory
 	m_Opcode = opcode | m_Memory[m_MemoryPosition + 1];
+
+	PrintOpcode();
 }
 
 void Chip8::ExecuteOpcode()
@@ -110,28 +160,32 @@ void Chip8::ExecuteOpcode()
 	//mask to the opcode to switch on the first bit
 	switch (m_Opcode & 0xF000)
 	{
-		case 0x000:
+	case 0x000:
+	{
+		//multiple other options
+		switch (m_Opcode & 0x000F)
 		{
-			//multiple other options
-			switch (m_Opcode & 0x000F)
-			{
-				case 0x0000: //0x00E0 clear screen
-				{
-					m_MemoryPosition += 2;
-					break;
-				}
+		case 0x0000: //0x00E0 clear screen
+		{
+			//Reset Screen
+			for (int i = 0; i < m_ScreenWidth * m_ScreenHeight; i++)
+				m_Screen[i] = 0; //clear to black
 
-				case 0x000E : //0x00EE. Return from a subroutine
-				{
-					//return to last position in the stack and reduce the stackindex
-					m_StackIndex--;
-					m_MemoryPosition = m_Stack[m_StackIndex];
-					break;
-				}
-			}		
-
+			m_MemoryPosition += 2;
 			break;
 		}
+
+		case 0x000E: //0x00EE. Return from a subroutine
+		{
+			//return to last position in the stack and reduce the stackindex
+			m_StackIndex--;
+			m_MemoryPosition = m_Stack[m_StackIndex];
+			break;
+		}
+		}
+
+		break;
+	}
 
 	case 0x1000: //1NNN jump to address NNN
 		n = m_Opcode & 0x0FFF;
@@ -172,6 +226,17 @@ void Chip8::ExecuteOpcode()
 
 		break;
 
+	case 0x5000: //5XY0 skip the next instruction if m_RegisterI[X] == m_Register[Y]
+		x = (m_Opcode & 0x0F00) >> 8; //change 0X00 0000 to 000X 
+		y = (m_Opcode & 0x00F0) >> 4;
+
+		if (m_RegisterI[x] == m_RegisterI[y])
+			m_MemoryPosition += 4; //skip next instruction
+		else
+			m_MemoryPosition += 2; //go to next instruction
+
+		break;
+
 	case 0x6000: //6XNN set m_RegisterI[X] to NN
 		x = (m_Opcode & 0x0F00) >> 8;
 		n = m_Opcode & 0x00FF;
@@ -191,41 +256,127 @@ void Chip8::ExecuteOpcode()
 		//Sub division for this opcode
 		switch (m_Opcode & 0x000F)
 		{
-			case 0x0000: //8XY0 set m_RegisterI[X] to the value of m_RegisterI[Y]
-					x = (m_Opcode & 0xF00) >> 8;
-					y = (m_Opcode & 0x0F0) >> 4;
+		case 0x0000: //8XY0 set m_RegisterI[X] to the value of m_RegisterI[Y]
+			x = (m_Opcode & 0xF00) >> 8;
+			y = (m_Opcode & 0x0F0) >> 4;
 
-					m_RegisterI[x] = m_RegisterI[y];
-					m_MemoryPosition += 2;
-					break;
+			m_RegisterI[x] = m_RegisterI[y];
+			m_MemoryPosition += 2;
+			break;
 
-			case 0x0002: //8XY2 sets m_Register[X] to VX AND m_Register[Y]
-					x = (m_Opcode & 0xF00) >> 8;
-					y = (m_Opcode & 0x0F0) >> 4;
+		case 0x0001: //8XY1 set m_Registers[X] to the value of m_Registers[X] OR m_Registers[Y]
+			x = (m_Opcode & 0xF00) >> 8;
+			y = (m_Opcode & 0x0F0) >> 4;
 
-					m_RegisterI[x] = m_RegisterI[x] & m_RegisterI[y];
-					m_MemoryPosition += 2;
-					break;
+			m_RegisterI[x] = m_RegisterI[x] | m_RegisterI[y];
+			m_MemoryPosition += 2;
+			break;
 
-			case 0x0005: //8XY5 m_Register[Y] is subtracted from m_Register[X]
-						 //		set m_Register[0xF] to 0 when there is a borrow and to 1 when there isn`t
-						 //		a borrow occurs whenever the subtrahend is greater than the minuend.
-				{
-					x = (m_Opcode & 0xF00) >> 8;
-					y = (m_Opcode & 0x0F0) >> 4;
+		case 0x0002: //8XY2 sets m_Register[X] to m_Register[X] AND m_Register[Y]
+			x = (m_Opcode & 0xF00) >> 8;
+			y = (m_Opcode & 0x0F0) >> 4;
 
-					if (m_RegisterI[y] > m_RegisterI[x])
-						m_RegisterI[0xF] = 0;
-					else
-						m_RegisterI[0xF] = 1;
+			m_RegisterI[x] = m_RegisterI[x] & m_RegisterI[y];
+			m_MemoryPosition += 2;
+			break;
 
-					m_RegisterI[x] = m_RegisterI[x] - m_RegisterI[y];				
+		case 0x0003: //8XY3 sets m_Register[X] to m_Register[X] XOR m_Register[Y]
+			x = (m_Opcode & 0xF00) >> 8;
+			y = (m_Opcode & 0x0F0) >> 4;
 
-					m_MemoryPosition += 2;
-					break;
-				}
+			m_RegisterI[x] = m_RegisterI[x] ^ m_RegisterI[y];
+			m_MemoryPosition += 2;
+			break;
+
+		case 0x0004: //8XY4 Adds _Register[Y] to  m_Register[X].  
+					 //		m_Register[0xF] is set to 1 when there's a carry, and to 0 when there isn't	
+		{
+			x = (m_Opcode & 0xF00) >> 8;
+			y = (m_Opcode & 0x0F0) >> 4;
+
+			if (m_RegisterI[y] > m_RegisterI[x])
+				m_RegisterI[0xF] = 1;
+			else
+				m_RegisterI[0xF] = 0;
+
+			m_RegisterI[x] = m_RegisterI[x] + m_RegisterI[y];
+
+			m_MemoryPosition += 2;
+			break;
+		}
+
+		case 0x0005: //8XY5 m_Register[Y] is subtracted from m_Register[X]
+					 //		set m_Register[0xF] to 0 when there is a borrow and to 1 when there isn`t
+					 //		a borrow occurs whenever the subtrahend is greater than the minuend.
+		{
+			x = (m_Opcode & 0xF00) >> 8;
+			y = (m_Opcode & 0x0F0) >> 4;
+
+			if (m_RegisterI[y] > m_RegisterI[x])
+				m_RegisterI[0xF] = 0;
+			else
+				m_RegisterI[0xF] = 1;
+
+			m_RegisterI[x] = m_RegisterI[x] - m_RegisterI[y];
+
+			m_MemoryPosition += 2;
+			break;
+		}
+		case 0x0006: //8XY6 shifts m_Register[X] right by one
+					 //		set m_Register[0xF]least significant bit of m_Register[X] before the shift
+		{
+			x = (m_Opcode & 0xF00) >> 8;
+			
+			m_RegisterI[0xF] = x & 0x1; //get least significant bit	
+		
+			m_RegisterI[x] = m_RegisterI[x] >> 1; //shift right
+
+			m_MemoryPosition += 2;
+			break;
+		}
+
+		case 0x0007: //8XY7 Set m_Register[X] to m_Register[Y] - m_Register[X]
+					 //		set m_Register[0xF] to 0 if there is a burrow and 1 when there isn`t
+		{
+			x = (m_Opcode & 0xF00) >> 8;
+
+
+			if (m_RegisterI[x] > m_RegisterI[y])
+				m_RegisterI[0xF] = 0;
+			else
+				m_RegisterI[0xF] = 1;
+
+			m_RegisterI[x] = m_RegisterI[y] - m_RegisterI[x];
+
+			m_MemoryPosition += 2;
+			break;
+		}
+		case 0x000E: //8XYE shifts m_Register[X] left by one
+					 //		set m_Register[0xF]least significant bit of m_Register[X] before the shift
+		{
+			x = (m_Opcode & 0xF00) >> 8;
+
+			m_RegisterI[0xF] = x & 0x1; //get least significant bit	
+
+			m_RegisterI[x] = m_RegisterI[x] << 1; //shift right
+
+			m_MemoryPosition += 2;
+			break;
+		}
 		}
 		break;
+	case 0x9000: //9XY0 skip the next instruction if m_Registers[X] doesn't equal m_Registers[Y]
+	{
+		x = (m_Opcode & 0x0F00) >> 8;
+		y = (m_Opcode & 0x00F0) >> 4;
+
+		if (m_RegisterI[x] != m_RegisterI[y])
+			m_MemoryPosition += 4;
+		else
+			m_MemoryPosition += 2;
+
+		break;
+	}
 
 	case 0xA000: //ANNN set RegisterIndex to NNN
 
@@ -241,7 +392,7 @@ void Chip8::ExecuteOpcode()
 
 		//limit rand value to 255
 		rnd = rand() % 0xFF;
-		m_RegisterI[x] = static_cast<unsigned char>(rnd & n);
+		m_RegisterI[x] = (rnd & n);
 		m_MemoryPosition += 2;
 		break;
 
@@ -289,38 +440,176 @@ void Chip8::ExecuteOpcode()
 		break;
 	}
 
+	case 0xE000:
+	{
+		switch (m_Opcode & 0x00FF)
+		{
+			case 0x009E: //EX9E Skips the next instruction if the key stored in m_Register[X] is pressed
+			{
+				x = (m_Opcode & 0x0F00) >> 8;
+				if (m_Keys[m_RegisterI[x]] != 0) //pressed
+					m_MemoryPosition += 4;
+				else
+					m_MemoryPosition += 2;
+
+				break;
+
+			}
+
+			case 0x00A1: //EXA1 Skips the next instruction if the key stored in m_Register[X] isn`t pressed
+			{
+				x = (m_Opcode & 0x0F00) >> 8;
+				if (m_Keys[m_RegisterI[x]] == 0) //pressed
+					m_MemoryPosition += 4;
+				else
+					m_MemoryPosition += 2;
+
+				break;
+
+			}
+		}
+		break;
+	}
+
 	case 0xF000: //multiple options
 	{
 		switch (m_Opcode & 0x00FF)
 		{
-			case 0x00A: //FX0A a key press is awaited and then stored in m_Registers[X]
-			{
-				bool bKeyPressed = false;
 
-				x = (m_Opcode & 0x0F00) >> 8;
-
-				//if the key is not pressed try again
-				if (!bKeyPressed)
-					return;
-
-				//m_RegisterI[x] = x;
-				m_MemoryPosition += 2;
-			}
-
-			case 0x001E: //FX1E Adds m_Registers[X] to RegisterIndex
-			{
-				x = (m_Opcode & 0x0F00) >> 8;
-
-				m_RegisterIIndex = x;
-				m_MemoryPosition += 2;
-			}
+		case 0x0007: //FX07 set m_Registers[X] to the value of the delay timer
+		{
+			x = (m_Opcode & 0x0F00) >> 8;
+			m_RegisterI[x] = m_DelayTimer;
+			m_MemoryPosition += 2;
+			break;
 		}
+
+		case 0x0015: //FX15 set the delaytimer to m_Registers[X]
+		{
+			x = (m_Opcode & 0x0F00) >> 8;
+			m_DelayTimer = m_RegisterI[x];
+			m_MemoryPosition += 2;
+			break;
+		}
+
+		case 0x0018: //FX15 set the soundtimer to m_Registers[X]
+		{
+			x = (m_Opcode & 0x0F00) >> 8;
+			m_SoundTimer = m_RegisterI[x];
+			m_MemoryPosition += 2;
+			break;
+		}
+
+		case 0x0029: //FX15 Sets m_Registerindex to the location of the sprite for the character m_Register[X]
+					 //		Characters 0-F are represented by a 4x5 font
+		{
+			x = (m_Opcode & 0x0F00) >> 8;
+			m_RegisterIIndex = m_RegisterI[x] * 0x5;
+			m_MemoryPosition += 2;
+			break;
+		}
+
+		case 0x0033: //FX33 store the Binary Coded decimal representation of m_Register[X] with the most significant of three digits at the address in m_RegisterIndex
+					 //		the middle digit at _RegisterIndex +1 and the least significant digit at m_RegisterIndex +2. In other words take the decimal representation 
+					 //		of m_Registers[X] place the hundreds digit in memory at the losatcion in m_RegisterIndex the tens digit in m-_RegisterIndex +1 
+					 //		and the ones digit in m_RegisterIndex +2 
+		{
+			//TODO:: Ask more info about this, what do these numbers represent
+
+			x = (m_Opcode & 0x0F00) >> 8;
+			U8 value = m_RegisterI[x];
+			U8 mostSignificant = value/100;
+			U8 middle = (value / 10) % 10;
+			U8 least = (value % 100) % 10;
+
+			m_Memory[m_RegisterIIndex] = mostSignificant;
+			m_Memory[m_RegisterIIndex + 1] = middle;
+			m_Memory[m_RegisterIIndex + 2] = least;
+
+			m_MemoryPosition += 2;
+			
+			break;
+		}
+
+		case 0x000A: //FX0A a key press is awaited and then stored in m_Registers[X]
+		{
+			bool bKeyPressed = false;
+
+			x = (m_Opcode & 0x0F00) >> 8;
+
+			cout << "Press Key" << endl;
+
+			for (U8 i = 0; i < 16; i++)
+			{
+				if (m_Keys[i] != 0)
+				{
+
+					m_RegisterI[x] = i;
+					bKeyPressed = true;
+					//m_Keys[i] = 0; //reset back to 0
+				}
+			}
+
+			//if the key is not pressed try again
+			if (!bKeyPressed)
+				return;
+
+			m_MemoryPosition += 2;
+			break;
+		}
+
+
+		case 0x001E: //FX1E Adds m_Registers[X] to RegisterIndex
+		{
+			x = (m_Opcode & 0x0F00) >> 8;
+
+			auto val = m_RegisterI[x];
+			m_RegisterIIndex += val;
+			m_MemoryPosition += 2;
+			break;
+		}
+
+		case 0x0055: //FX55 store m_Registers[0] to m_Registers[X] in memory starting at adress m_RegisterIndex
+					 //		the value of the I register will be incremented by X + 1. This is due to the changing of addresses by the interpreter.
+		{
+			x = (m_Opcode & 0x0F00) >> 8;
+
+			for (int i = 0; i <= x; i++)
+				m_Memory[m_RegisterIIndex + i] = m_RegisterI[i];
+
+			m_RegisterIIndex += x + 1;
+
+			m_MemoryPosition += 2;
+			break;
+
+		}
+
+		case 0x0065: //FX65 fills m_Registers[0] to m_Registers[X] with values in memory starting at adress m_RegisterIndex
+					 //		the value of the I register will be incremented by X + 1. This is due to the changing of addresses by the interpreter.
+		{
+			x = (m_Opcode & 0x0F00) >> 8;
+
+			for (int i = 0; i <= x; i++)
+				m_RegisterI[i] = m_Memory[m_RegisterIIndex + i];
+
+			m_RegisterIIndex += x + 1;
+
+			m_MemoryPosition += 2;
+			break;
+
+		}
+		}
+		break;
 	}
 	}
 
 
 }
 
+void Chip8::PrintOpcode()
+{
+	cout << std::hex << m_Opcode << endl;
+}
 
 //Load a binary file in memory
 void Chip8::LoadGame(const char* filename)
@@ -337,12 +626,12 @@ void Chip8::LoadGame(const char* filename)
 	}
 
 	//get file size
-	file.seekg(0,file.end);
+	file.seekg(0, file.end);
 	auto size = static_cast<int>(file.tellg());
 	file.seekg(0, file.beg);
 
 	//read file
-	auto buffer = new char[size];	
+	auto buffer = new char[size];
 	file.read(buffer, size);
 	file.close();
 
@@ -355,7 +644,7 @@ void Chip8::LoadGame(const char* filename)
 
 }
 
-void Chip8::PressKey(int keyIndex, unsigned char pressed)
+void Chip8::PressKey(int keyIndex, U8 pressed)
 {
 	m_Keys[keyIndex] = pressed;
 }
