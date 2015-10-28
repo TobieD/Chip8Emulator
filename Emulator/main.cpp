@@ -1,5 +1,4 @@
 #include <iostream>
-#include <chrono> //time stuff
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "Chip8.h"
@@ -23,18 +22,19 @@ protected:
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void drop_callback(GLFWwindow* window, int amount, const char** files);
 void UpdateTexture(Chip8 * chip8);
+void ResetChip8();
 
 //Constants	
 #pragma region Constants
 //Window
-const GLuint WINDOW_WIDTH = 1270, WINDOW_HEIGHT = 780;
+const GLuint WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 780;
 const string WINDOW_NAME = "Chip8 Emulator - Devries Tobie";
 
 //Chip8
 const int CHIP8_WIDTH = 64, CHIP8_HEIGHT = 32;
 const float CLEAR_COLOR = 0.0f;
-const int SPEED = 5;
-const string GAME = "Resources/TETRIS";
+const int SPEED = 4;
+string GAME = "Resources/TETRIS";
 
 #pragma endregion
 
@@ -65,17 +65,19 @@ const GLchar* fragmentSource =
 "}";
 #pragma endregion 
 
+//Size of Chip8 screen + 3 channels(RGB)
 unsigned char m_screenData[CHIP8_WIDTH*CHIP8_HEIGHT][3];
 Chip8* m_chip8;
+GLFWwindow* m_Window;
 
 // The MAIN function, from here we start the application and run the game loop
 int main()
 {	
 	//Overwrite clog buffer
 	LogBuf log;
-	clog.rdbuf(&log);
+	cerr.rdbuf(&log);
 
-	//Create OpenGL Window
+	//1. Create OpenGL Window
 	#pragma region OpenGL Window Creation
 
 	std::cout << "Starting GLFW context, OpenGL 3.3" << std::endl;
@@ -95,9 +97,9 @@ int main()
 	string windowName = WINDOW_NAME + " - " + GAME.substr(pos + 1) + " - " + to_string(SPEED);
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, windowName.c_str(), NULL, NULL);
-	glfwMakeContextCurrent(window);
-	if (!window)
+	m_Window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, windowName.c_str(), NULL, NULL);
+	glfwMakeContextCurrent(m_Window);
+	if (!m_Window)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
 		glfwTerminate();
@@ -105,8 +107,8 @@ int main()
 	}
 
 	// Set the required callback functions
-	glfwSetKeyCallback(window, key_callback);
-	glfwSetDropCallback(window, drop_callback);
+	glfwSetKeyCallback(m_Window, key_callback);
+	glfwSetDropCallback(m_Window, drop_callback);
 
 	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
@@ -211,25 +213,17 @@ int main()
 	m_chip8->LoadGame(GAME.c_str());
 	m_chip8->SetRunSpeed(SPEED);
 
-	auto t_start = std::chrono::high_resolution_clock::now();
-
 	// Game loop
-	while (!glfwWindowShouldClose(window))
+	while (!glfwWindowShouldClose(m_Window))
 	{
-		//get current time
-		auto t_now = std::chrono::high_resolution_clock::now();
-		auto elapsedTime = std::chrono::duration_cast<std::chrono::duration<float>>(t_now - t_start).count();
-
-		UNREFERENCED_PARAMETER(elapsedTime);
-
 		// Check if any events have been activated (key pressed, mouse moved etc.) and call corresponding response functions
 		glfwPollEvents();
 
-		//Update
+		//Update texture when draw flag is set
 		if(m_chip8->shouldDraw())
 			UpdateTexture(m_chip8);
 
-		m_chip8->Run();
+		m_chip8->Run();			
 
 		// Render
 		// Clear the colorbuffer
@@ -240,7 +234,8 @@ int main()
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 		// Swap the screen buffers
-		glfwSwapBuffers(window);
+		glfwSwapInterval(1);
+		glfwSwapBuffers(m_Window);
 	}
 
 	//clean up m_chip8;
@@ -264,75 +259,125 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 {
 	UNREFERENCED_PARAMETER(action);
 	UNREFERENCED_PARAMETER(mode);
-	UNREFERENCED_PARAMETER(scancode);
+	UNREFERENCED_PARAMETER(scancode);	
 
+	//Chip8 keys (0 == released, 1 == Pressed)
+
+	//1, 2 , 3 , C
+	if		(key == GLFW_KEY_1 && action == GLFW_RELEASE) m_chip8->PressKey(1, 0);
+	else if (key == GLFW_KEY_2 && action == GLFW_RELEASE) m_chip8->PressKey(2, 0);
+	else if (key == GLFW_KEY_3 && action == GLFW_RELEASE) m_chip8->PressKey(3, 0);
+	else if (key == GLFW_KEY_4 && action == GLFW_RELEASE) m_chip8->PressKey(12, 0);	
+	
+
+	//4,5,6,
+	else if (key == GLFW_KEY_Q && action == GLFW_RELEASE) m_chip8->PressKey(4, 0);
+	else if (key == GLFW_KEY_W && action == GLFW_RELEASE) m_chip8->PressKey(5, 0);
+	else if (key == GLFW_KEY_E && action == GLFW_RELEASE) m_chip8->PressKey(6, 0);
+	else if (key == GLFW_KEY_R && action == GLFW_RELEASE) m_chip8->PressKey(13, 0);	
+
+	//7,8,9,E
+	else if (key == GLFW_KEY_A && action == GLFW_RELEASE) m_chip8->PressKey(7, 0);
+	else if (key == GLFW_KEY_S && action == GLFW_RELEASE) m_chip8->PressKey(8, 0);
+	else if (key == GLFW_KEY_D && action == GLFW_RELEASE) m_chip8->PressKey(9, 0);
+	else if (key == GLFW_KEY_F && action == GLFW_RELEASE) m_chip8->PressKey(14, 0);	
+
+	//A, 0, B, F
+	else if (key == GLFW_KEY_Z && action == GLFW_RELEASE) m_chip8->PressKey(10, 0);
+	else if (key == GLFW_KEY_X && action == GLFW_RELEASE) m_chip8->PressKey(0,  0);
+	else if (key == GLFW_KEY_C && action == GLFW_RELEASE) m_chip8->PressKey(11, 0);
+	else if (key == GLFW_KEY_V && action == GLFW_RELEASE) m_chip8->PressKey(15, 0);
+
+
+	//PRESSED
+	//1, 2 , 3 , C
+	if		(key == GLFW_KEY_1 && action == GLFW_PRESS) m_chip8->PressKey(1, 1);
+	else if (key == GLFW_KEY_2 && action == GLFW_PRESS) m_chip8->PressKey(2, 1);
+	else if (key == GLFW_KEY_3 && action == GLFW_PRESS) m_chip8->PressKey(3, 1);
+	else if (key == GLFW_KEY_4 && action == GLFW_PRESS) m_chip8->PressKey(12,1);
+
+
+	//4,5,6,
+	else if (key == GLFW_KEY_Q && action == GLFW_PRESS) m_chip8->PressKey(4, 1);
+	else if (key == GLFW_KEY_W && action == GLFW_PRESS) m_chip8->PressKey(5, 1);
+	else if (key == GLFW_KEY_E && action == GLFW_PRESS) m_chip8->PressKey(6, 1);
+	else if (key == GLFW_KEY_R && action == GLFW_PRESS) m_chip8->PressKey(13,1);
+
+	//7,8,9,E
+	else if (key == GLFW_KEY_A && action == GLFW_PRESS) m_chip8->PressKey(7, 1);
+	else if (key == GLFW_KEY_S && action == GLFW_PRESS) m_chip8->PressKey(8, 1);
+	else if (key == GLFW_KEY_D && action == GLFW_PRESS) m_chip8->PressKey(9, 1);
+	else if (key == GLFW_KEY_F && action == GLFW_PRESS) m_chip8->PressKey(14,1);
+
+	//A, 0, B, F
+	else if (key == GLFW_KEY_Z && action == GLFW_PRESS) m_chip8->PressKey(10, 1);
+	else if (key == GLFW_KEY_X && action == GLFW_PRESS) m_chip8->PressKey(0,	1);
+	else if (key == GLFW_KEY_C && action == GLFW_PRESS) m_chip8->PressKey(11, 1);
+	else if (key == GLFW_KEY_V && action == GLFW_PRESS) m_chip8->PressKey(15, 1);
+	
 	//exit
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, GL_TRUE);
 
-
-	//Chip8 keys	
-
-	if		(key == GLFW_KEY_1 && action == GLFW_RELEASE) m_chip8->PressKey(0x1, 0);
-	else if (key == GLFW_KEY_2 && action == GLFW_RELEASE) m_chip8->PressKey(0x2, 0);
-	else if (key == GLFW_KEY_3 && action == GLFW_RELEASE) m_chip8->PressKey(0x3, 0);
-	else if (key == GLFW_KEY_4 && action == GLFW_RELEASE) m_chip8->PressKey(0xC, 0);
-	else if (key == GLFW_KEY_A && action == GLFW_RELEASE) m_chip8->PressKey(0x4, 0);
-	else if (key == GLFW_KEY_Z && action == GLFW_RELEASE) m_chip8->PressKey(0x5, 0);
-	else if (key == GLFW_KEY_E && action == GLFW_RELEASE) m_chip8->PressKey(0x6, 0);
-	else if (key == GLFW_KEY_R && action == GLFW_RELEASE) m_chip8->PressKey(0xD, 0);
-	else if (key == GLFW_KEY_Q && action == GLFW_RELEASE) m_chip8->PressKey(0x7, 0);
-	else if (key == GLFW_KEY_S && action == GLFW_RELEASE) m_chip8->PressKey(0x8, 0);
-	else if (key == GLFW_KEY_D && action == GLFW_RELEASE) m_chip8->PressKey(0x9, 0);
-	else if (key == GLFW_KEY_F && action == GLFW_RELEASE) m_chip8->PressKey(0xE, 0);
-	else if (key == GLFW_KEY_W && action == GLFW_RELEASE) m_chip8->PressKey(0xA, 0);
-	else if (key == GLFW_KEY_X && action == GLFW_RELEASE) m_chip8->PressKey(0x0, 0);
-	else if (key == GLFW_KEY_C && action == GLFW_RELEASE) m_chip8->PressKey(0xB, 0);
-	else if (key == GLFW_KEY_V && action == GLFW_RELEASE) m_chip8->PressKey(0xF, 0);
-
-	if (	 key == GLFW_KEY_1 && action == GLFW_PRESS) m_chip8->PressKey(0x1, 1);
-	else if (key == GLFW_KEY_2 && action == GLFW_PRESS) m_chip8->PressKey(0x2, 1);
-	else if (key == GLFW_KEY_3 && action == GLFW_PRESS) m_chip8->PressKey(0x3, 1);
-	else if (key == GLFW_KEY_4 && action == GLFW_PRESS) m_chip8->PressKey(0xC, 1);
-	else if (key == GLFW_KEY_A && action == GLFW_PRESS) m_chip8->PressKey(0x4, 1);
-	else if (key == GLFW_KEY_Z && action == GLFW_PRESS) m_chip8->PressKey(0x5, 1);
-	else if (key == GLFW_KEY_E && action == GLFW_PRESS) m_chip8->PressKey(0x6, 1);
-	else if (key == GLFW_KEY_R && action == GLFW_PRESS) m_chip8->PressKey(0xD, 1);
-	else if (key == GLFW_KEY_Q && action == GLFW_PRESS) m_chip8->PressKey(0x7, 1);
-	else if (key == GLFW_KEY_S && action == GLFW_PRESS) m_chip8->PressKey(0x8, 1);
-	else if (key == GLFW_KEY_D && action == GLFW_PRESS) m_chip8->PressKey(0x9, 1);
-	else if (key == GLFW_KEY_F && action == GLFW_PRESS) m_chip8->PressKey(0xE, 1);
-	else if (key == GLFW_KEY_W && action == GLFW_PRESS) m_chip8->PressKey(0xA, 1);
-	else if (key == GLFW_KEY_X && action == GLFW_PRESS) m_chip8->PressKey(0x0, 1);
-	else if (key == GLFW_KEY_C && action == GLFW_PRESS) m_chip8->PressKey(0xB, 1);
-	else if (key == GLFW_KEY_V && action == GLFW_PRESS) m_chip8->PressKey(0xF, 1);
-
-	
-	
-
-	//cout << "Key " << ((action == GLFW_RELEASE) ? "pressed: " : "released: ") << key;
-
+	//reset current Game
 	if (key == GLFW_KEY_P && action == GLFW_PRESS)
 	{
-		m_chip8->Initialize();
-		m_chip8->LoadGame(GAME.c_str());
+		ResetChip8();
+	}
+
+	//Speed up game
+	if (key == GLFW_KEY_KP_SUBTRACT && action == GLFW_PRESS)
+	{
+		int speed = m_chip8->GetRunSpeed();
+		speed--;
+		if (speed < 1)
+		{
+			speed = 1;
+		}
+		m_chip8->SetRunSpeed(speed);
+	}
+
+	//slow game
+	if (key == GLFW_KEY_KP_ADD && action == GLFW_PRESS)
+	{
+		int speed = m_chip8->GetRunSpeed();
+
+		speed++;
+		if (speed > 60)
+		{
+			speed = 60;
+		}
+
+		m_chip8->SetRunSpeed(speed);
 	}
 
 }
 
+//called whenever a file gets dropped on the window
 void drop_callback(GLFWwindow* window,int amount, const char** files)
 {
-	auto file = files[0];
-	
-	m_chip8->Initialize();
-	m_chip8->LoadGame(file);
+	UNREFERENCED_PARAMETER(window);
+	UNREFERENCED_PARAMETER(amount);
+
+	GAME = files[0]; //get first file
+	ResetChip8();
 }
 
 //Copy the chip8 ScreenData to the openGL texture
 void UpdateTexture(Chip8 * chip8)
 {	
+	//Set RGB channel of texture
 	for (auto x = 0; x < CHIP8_WIDTH * CHIP8_HEIGHT; x++)
+	{
 		m_screenData[x][0] = m_screenData[x][1] = m_screenData[x][2] = chip8->m_Screen[x] == 1 ? 225 : 35;
+	}
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, CHIP8_WIDTH, CHIP8_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, m_screenData);
+}
+
+void ResetChip8()
+{
+	m_chip8->Initialize();
+	m_chip8->LoadGame(GAME.c_str());
+	UpdateTexture(m_chip8); //clear screen
 }
