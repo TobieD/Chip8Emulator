@@ -5,19 +5,19 @@
 #include <sstream>
 
 //#define LOGREGISTER
-#define LOGOPCODE
+//#define LOGOPCODE
 
 using namespace std;
 
-Chip8::Chip8(int screenWidth, int screenHeight) :
+Chip8::Chip8(int screenWidth, int screenHeight,int speed) :
+	m_RunSpeed(speed),
 	m_ScreenWidth(screenWidth),
 	m_ScreenHeight(screenHeight),
 	m_MemoryPosition(0x200),
 	m_StackIndex(0),
 	m_RegisterIndex(0),
 	m_bGameLoaded(false),
-	m_bShouldDraw(false),
-	m_RunSpeed(1)
+	m_bShouldDraw(false)
 {
 
 }
@@ -337,9 +337,8 @@ void Chip8::ExecuteOpcode()
 			U8 registerX = GetRegisterData(x);
 			U8 registerY = GetRegisterData(y);
 
-			bool bCarry= registerY > registerX;
-			m_Register[0xF] = bCarry ? 0 : 1;
-
+			bool bCarry = registerY > registerX;
+			m_Register[0xF] = bCarry ? 1 : 0;
 			m_Register[x] += registerY;
 
 			m_MemoryPosition += 2;
@@ -358,7 +357,6 @@ void Chip8::ExecuteOpcode()
 			
 			bool bBurrow = registerY > registerX;
 			m_Register[0xF] = bBurrow? 0: 1;
-
 			m_Register[x] = registerX - registerY;
 
 			m_MemoryPosition += 2;
@@ -370,8 +368,7 @@ void Chip8::ExecuteOpcode()
 			U8 x = (m_Opcode & 0xF00) >> 8;
 			U8 registerX = GetRegisterData(x);
 						
-			m_Register[0xF] = registerX & 0x1; //get least significant bit	
-		
+			m_Register[0xF] = registerX & 0x1; //get least significant bit		
 			m_Register[x] = registerX >> 1; //shift right
 
 			m_MemoryPosition += 2;
@@ -438,10 +435,8 @@ void Chip8::ExecuteOpcode()
 
 	case 0xB000: //BNNN jump to address NNN + m_Register[0]
 	{
-
 		U16 n = m_Opcode & 0x0FFF;
 		m_MemoryPosition = n + m_Register[0];
-
 		break;
 	}
 
@@ -486,7 +481,7 @@ void Chip8::ExecuteOpcode()
 			{
 				U8 x = (m_Opcode & 0x0F00) >> 8;
 				U8 registerData = GetRegisterData(x);
-				if (IsKeyPressed(registerData) != 0) //pressed
+				if (IsKeyPressed(registerData)) //pressed
 				{
 					m_MemoryPosition += 4;
 				}
@@ -501,7 +496,7 @@ void Chip8::ExecuteOpcode()
 			{
 				U8 x = (m_Opcode & 0x0F00) >> 8;
 				U8 registerData = GetRegisterData(x);
-				if (IsKeyPressed(registerData) == 0) //not pressed
+				if (!IsKeyPressed(registerData)) //not pressed
 				{
 					m_MemoryPosition += 4;
 				}
@@ -528,7 +523,7 @@ void Chip8::ExecuteOpcode()
 				break;
 			}
 
-			case 0x0015: //FX15 set the delaytimer to m_Registers[X]
+			case 0x0015: //FX15 set the delay timer to m_Registers[X]
 			{
 				U8 x = (m_Opcode & 0x0F00) >> 8;
 				m_DelayTimer = GetRegisterData(x);
@@ -536,7 +531,7 @@ void Chip8::ExecuteOpcode()
 				break;
 			}
 
-			case 0x0018: //FX15 set the soundtimer to m_Registers[X]
+			case 0x0018: //FX15 set the sound timer to m_Registers[X]
 			{
 				U8 x = (m_Opcode & 0x0F00) >> 8;
 				m_SoundTimer = GetRegisterData(x);
@@ -548,14 +543,14 @@ void Chip8::ExecuteOpcode()
 						 //		Characters 0-F are represented by a 4x5 font
 			{
 				U8 x = (m_Opcode & 0x0F00) >> 8;
-				m_RegisterIndex = GetRegisterData(x) * 0x5;
+				m_RegisterIndex = GetRegisterData(x) * 5;
 				m_MemoryPosition += 2;
 				break;
 			}
 
 			case 0x0033: //FX33 store the Binary Coded decimal representation of m_Register[X] with the most significant of three digits at the address in m_RegisterIndex
 						 //		the middle digit at _RegisterIndex +1 and the least significant digit at m_RegisterIndex +2. In other words take the decimal representation 
-						 //		of m_Registers[X] place the hundreds digit in memory at the losatcion in m_RegisterIndex the tens digit in m-_RegisterIndex +1 
+						 //		of m_Registers[X] place the hundreds digit in memory at the location in m_RegisterIndex the tens digit in m-_RegisterIndex +1 
 						 //		and the ones digit in m_RegisterIndex +2 
 			{
 				U8 x = (m_Opcode & 0x0F00) >> 8;
@@ -699,6 +694,25 @@ void Chip8::LoadGame(const char* filename)
 void Chip8::PressKey(int keyIndex, U8 pressed)
 {
 	m_Keys[keyIndex] = pressed;
+}
+
+void Chip8::IncreaseSpeed()
+{
+	m_RunSpeed++;
+	if(m_RunSpeed > 60)
+	{
+		m_RunSpeed = 60;
+	}
+}
+
+void Chip8::ReduceSpeed()
+{
+	m_RunSpeed--;
+	if (m_RunSpeed < 1)
+	{
+		m_RunSpeed = 1;
+	}
+
 }
 
 void Chip8::ClearScreen()

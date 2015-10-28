@@ -23,18 +23,19 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 void drop_callback(GLFWwindow* window, int amount, const char** files);
 void UpdateTexture(Chip8 * chip8);
 void ResetChip8();
+string GetWindowTitle();
 
 //Constants	
 #pragma region Constants
 //Window
-const GLuint WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 780;
+const GLuint WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 640;
 const string WINDOW_NAME = "Chip8 Emulator - Devries Tobie";
 
 //Chip8
 const int CHIP8_WIDTH = 64, CHIP8_HEIGHT = 32;
 const float CLEAR_COLOR = 0.0f;
 const int SPEED = 4;
-string GAME = "Resources/TETRIS";
+string GAME = "Resources\\TETRIS";
 
 #pragma endregion
 
@@ -91,13 +92,8 @@ int main()
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-
-	auto pos = GAME.find_first_of("/"); 
-
-	string windowName = WINDOW_NAME + " - " + GAME.substr(pos + 1) + " - " + to_string(SPEED);
-
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	m_Window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, windowName.c_str(), NULL, NULL);
+	m_Window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, GetWindowTitle().c_str(), NULL, NULL);
 	glfwMakeContextCurrent(m_Window);
 	if (!m_Window)
 	{
@@ -208,10 +204,9 @@ int main()
 	#pragma endregion 
 
 	//5. Create m_chip8 Object and load a game	
-	m_chip8 = new Chip8(CHIP8_WIDTH, CHIP8_HEIGHT);
+	m_chip8 = new Chip8(CHIP8_WIDTH, CHIP8_HEIGHT,SPEED);
 	m_chip8->Initialize();
 	m_chip8->LoadGame(GAME.c_str());
-	m_chip8->SetRunSpeed(SPEED);
 
 	// Game loop
 	while (!glfwWindowShouldClose(m_Window))
@@ -259,65 +254,67 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 {
 	UNREFERENCED_PARAMETER(action);
 	UNREFERENCED_PARAMETER(mode);
-	UNREFERENCED_PARAMETER(scancode);	
+	UNREFERENCED_PARAMETER(scancode);
 
 	//Chip8 keys (0 == released, 1 == Pressed)
 
 	//1, 2 , 3 , C
-	if		(key == GLFW_KEY_1 && action == GLFW_RELEASE) m_chip8->PressKey(1, 0);
+	if (key == GLFW_KEY_1 && action == GLFW_RELEASE) m_chip8->PressKey(1, 0);
 	else if (key == GLFW_KEY_2 && action == GLFW_RELEASE) m_chip8->PressKey(2, 0);
 	else if (key == GLFW_KEY_3 && action == GLFW_RELEASE) m_chip8->PressKey(3, 0);
-	else if (key == GLFW_KEY_4 && action == GLFW_RELEASE) m_chip8->PressKey(12, 0);	
-	
+	else if (key == GLFW_KEY_4 && action == GLFW_RELEASE) m_chip8->PressKey(12, 0);
+
 
 	//4,5,6,
 	else if (key == GLFW_KEY_Q && action == GLFW_RELEASE) m_chip8->PressKey(4, 0);
 	else if (key == GLFW_KEY_W && action == GLFW_RELEASE) m_chip8->PressKey(5, 0);
 	else if (key == GLFW_KEY_E && action == GLFW_RELEASE) m_chip8->PressKey(6, 0);
-	else if (key == GLFW_KEY_R && action == GLFW_RELEASE) m_chip8->PressKey(13, 0);	
+	else if (key == GLFW_KEY_R && action == GLFW_RELEASE) m_chip8->PressKey(13, 0);
 
 	//7,8,9,E
 	else if (key == GLFW_KEY_A && action == GLFW_RELEASE) m_chip8->PressKey(7, 0);
 	else if (key == GLFW_KEY_S && action == GLFW_RELEASE) m_chip8->PressKey(8, 0);
 	else if (key == GLFW_KEY_D && action == GLFW_RELEASE) m_chip8->PressKey(9, 0);
-	else if (key == GLFW_KEY_F && action == GLFW_RELEASE) m_chip8->PressKey(14, 0);	
+	else if (key == GLFW_KEY_F && action == GLFW_RELEASE) m_chip8->PressKey(14, 0);
 
 	//A, 0, B, F
 	else if (key == GLFW_KEY_Z && action == GLFW_RELEASE) m_chip8->PressKey(10, 0);
-	else if (key == GLFW_KEY_X && action == GLFW_RELEASE) m_chip8->PressKey(0,  0);
+	else if (key == GLFW_KEY_X && action == GLFW_RELEASE) m_chip8->PressKey(0, 0);
 	else if (key == GLFW_KEY_C && action == GLFW_RELEASE) m_chip8->PressKey(11, 0);
 	else if (key == GLFW_KEY_V && action == GLFW_RELEASE) m_chip8->PressKey(15, 0);
 
 
 	//PRESSED
 	//1, 2 , 3 , C
-	if		(key == GLFW_KEY_1 && action == GLFW_PRESS) m_chip8->PressKey(1, 1);
+	if (key == GLFW_KEY_1 && action == GLFW_PRESS) m_chip8->PressKey(1, 1);
 	else if (key == GLFW_KEY_2 && action == GLFW_PRESS) m_chip8->PressKey(2, 1);
 	else if (key == GLFW_KEY_3 && action == GLFW_PRESS) m_chip8->PressKey(3, 1);
-	else if (key == GLFW_KEY_4 && action == GLFW_PRESS) m_chip8->PressKey(12,1);
+	else if (key == GLFW_KEY_4 && action == GLFW_PRESS) m_chip8->PressKey(12, 1);
 
 
 	//4,5,6,
 	else if (key == GLFW_KEY_Q && action == GLFW_PRESS) m_chip8->PressKey(4, 1);
 	else if (key == GLFW_KEY_W && action == GLFW_PRESS) m_chip8->PressKey(5, 1);
 	else if (key == GLFW_KEY_E && action == GLFW_PRESS) m_chip8->PressKey(6, 1);
-	else if (key == GLFW_KEY_R && action == GLFW_PRESS) m_chip8->PressKey(13,1);
+	else if (key == GLFW_KEY_R && action == GLFW_PRESS) m_chip8->PressKey(13, 1);
 
 	//7,8,9,E
 	else if (key == GLFW_KEY_A && action == GLFW_PRESS) m_chip8->PressKey(7, 1);
 	else if (key == GLFW_KEY_S && action == GLFW_PRESS) m_chip8->PressKey(8, 1);
 	else if (key == GLFW_KEY_D && action == GLFW_PRESS) m_chip8->PressKey(9, 1);
-	else if (key == GLFW_KEY_F && action == GLFW_PRESS) m_chip8->PressKey(14,1);
+	else if (key == GLFW_KEY_F && action == GLFW_PRESS) m_chip8->PressKey(14, 1);
 
 	//A, 0, B, F
 	else if (key == GLFW_KEY_Z && action == GLFW_PRESS) m_chip8->PressKey(10, 1);
-	else if (key == GLFW_KEY_X && action == GLFW_PRESS) m_chip8->PressKey(0,	1);
+	else if (key == GLFW_KEY_X && action == GLFW_PRESS) m_chip8->PressKey(0, 1);
 	else if (key == GLFW_KEY_C && action == GLFW_PRESS) m_chip8->PressKey(11, 1);
 	else if (key == GLFW_KEY_V && action == GLFW_PRESS) m_chip8->PressKey(15, 1);
-	
+
 	//exit
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+	{
 		glfwSetWindowShouldClose(window, GL_TRUE);
+	}
 
 	//reset current Game
 	if (key == GLFW_KEY_P && action == GLFW_PRESS)
@@ -325,30 +322,17 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		ResetChip8();
 	}
 
+	if (key == GLFW_KEY_KP_ADD && action == GLFW_PRESS)
+	{
+		m_chip8->IncreaseSpeed();
+		glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
+	}
+
 	//Speed up game
 	if (key == GLFW_KEY_KP_SUBTRACT && action == GLFW_PRESS)
 	{
-		int speed = m_chip8->GetRunSpeed();
-		speed--;
-		if (speed < 1)
-		{
-			speed = 1;
-		}
-		m_chip8->SetRunSpeed(speed);
-	}
-
-	//slow game
-	if (key == GLFW_KEY_KP_ADD && action == GLFW_PRESS)
-	{
-		int speed = m_chip8->GetRunSpeed();
-
-		speed++;
-		if (speed > 60)
-		{
-			speed = 60;
-		}
-
-		m_chip8->SetRunSpeed(speed);
+		m_chip8->ReduceSpeed();
+		glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
 	}
 
 }
@@ -361,6 +345,7 @@ void drop_callback(GLFWwindow* window,int amount, const char** files)
 
 	GAME = files[0]; //get first file
 	ResetChip8();
+	glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
 }
 
 //Copy the chip8 ScreenData to the openGL texture
@@ -380,4 +365,12 @@ void ResetChip8()
 	m_chip8->Initialize();
 	m_chip8->LoadGame(GAME.c_str());
 	UpdateTexture(m_chip8); //clear screen
+}
+
+string  GetWindowTitle()
+{
+	int speed = (m_chip8)?m_chip8->GetRunSpeed():SPEED;
+	int pos = GAME.find_last_of('\\');
+	
+	return WINDOW_NAME + " - " + GAME.substr(pos + 1) + " - " + to_string(speed);
 }
