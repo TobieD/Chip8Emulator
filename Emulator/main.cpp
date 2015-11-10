@@ -36,6 +36,7 @@ const int CHIP8_WIDTH = 64, CHIP8_HEIGHT = 32;
 const float CLEAR_COLOR = 0.0f;
 const int SPEED = 4;
 string GAME = "Resources\\TETRIS";
+bool bInvertColors = false;
 
 #pragma endregion
 
@@ -151,7 +152,7 @@ int main()
 	
 #pragma endregion 
 
-	//3. Create Shaders
+	//3. Create Shader
 	#pragma region Shader Loading	
 	
 	//Create Vertex and Fragment shader
@@ -221,7 +222,7 @@ int main()
 		m_chip8->Run();			
 
 		// Render
-		// Clear the colorbuffer
+		// Clear the color buffer
 		glClearColor(CLEAR_COLOR, CLEAR_COLOR, CLEAR_COLOR,1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
@@ -257,6 +258,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	UNREFERENCED_PARAMETER(scancode);
 
 	//Chip8 keys (0 == released, 1 == Pressed)
+
 
 	//1, 2 , 3 , C
 	if (key == GLFW_KEY_1 && action == GLFW_RELEASE) m_chip8->PressKey(1, 0);
@@ -322,19 +324,30 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		ResetChip8();
 	}
 
-	if (key == GLFW_KEY_KP_ADD && action == GLFW_PRESS)
+	if (key == GLFW_KEY_KP_ADD)
 	{
 		m_chip8->IncreaseSpeed();
 		glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
 	}
 
 	//Speed up game
-	if (key == GLFW_KEY_KP_SUBTRACT && action == GLFW_PRESS)
+	if (key == GLFW_KEY_KP_SUBTRACT )
 	{
 		m_chip8->ReduceSpeed();
 		glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
 	}
 
+	if(key == GLFW_KEY_I && action == GLFW_PRESS)
+	{
+		bInvertColors = !bInvertColors;
+		UpdateTexture(m_chip8);
+	}
+
+	if (key == GLFW_KEY_T  && action == GLFW_PRESS)
+	{
+		m_chip8->SetCompatibilityMode();
+		glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
+	}
 }
 
 //called whenever a file gets dropped on the window
@@ -354,7 +367,17 @@ void UpdateTexture(Chip8 * chip8)
 	//Set RGB channel of texture
 	for (auto x = 0; x < CHIP8_WIDTH * CHIP8_HEIGHT; x++)
 	{
-		m_screenData[x][0] = m_screenData[x][1] = m_screenData[x][2] = chip8->m_Screen[x] == 1 ? 225 : 35;
+		unsigned char w = 245;
+		unsigned char b = 15;
+
+		if(bInvertColors)
+		{
+			unsigned char t = w;
+			w = b;
+			b = t;
+		}
+
+		m_screenData[x][0] = m_screenData[x][1] = m_screenData[x][2] = chip8->m_Screen[x] == 1 ? w : b;
 	}
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, CHIP8_WIDTH, CHIP8_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, m_screenData);
@@ -371,6 +394,12 @@ string  GetWindowTitle()
 {
 	int speed = (m_chip8)?m_chip8->GetRunSpeed():SPEED;
 	int pos = GAME.find_last_of('\\');
+	string mode = "OFF";
 	
-	return WINDOW_NAME + " - " + GAME.substr(pos + 1) + " - " + to_string(speed);
+	if (m_chip8)
+	{
+		mode = m_chip8->GetCompatibilityMode() ? "ON" : "OFF";
+	}
+	
+	return WINDOW_NAME + " - " + GAME.substr(pos + 1) + " - " + to_string(speed) + " [Compatibility mode: " + mode + "]";
 }

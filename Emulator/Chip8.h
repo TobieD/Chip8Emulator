@@ -17,6 +17,8 @@ public:
 	void LoadGame(const char* filename);	
 	void IncreaseSpeed();
 	void ReduceSpeed();
+	void SetCompatibilityMode();
+
 
 	//Key press
 	void PressKey(int keyIndex, U8 pressed);
@@ -24,16 +26,15 @@ public:
 	//Getters
 	bool shouldDraw() { return m_bShouldDraw; }
 	int GetRunSpeed() { return m_RunSpeed; }
+	bool GetCompatibilityMode()	{ return m_bEnableCompatibility; }
 
 	U8 m_Screen[64 * 32]; //Chip8 Screen
-
 	
 private:
 
-	
-
 	void CreateOpcode();
 	void ExecuteOpcode();
+
 	U8 GetRegisterData(int index);
 
 	void ClearScreen();
@@ -63,6 +64,7 @@ private:
 
 	//flags
 	bool m_bGameLoaded, m_bShouldDraw;
+	bool m_bEnableCompatibility;
 
 };
 

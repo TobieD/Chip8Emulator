@@ -17,7 +17,8 @@ Chip8::Chip8(int screenWidth, int screenHeight,int speed) :
 	m_StackIndex(0),
 	m_RegisterIndex(0),
 	m_bGameLoaded(false),
-	m_bShouldDraw(false)
+	m_bShouldDraw(false),
+	m_bEnableCompatibility(false)
 {
 
 }
@@ -86,6 +87,7 @@ void Chip8::Initialize()
 	//reset flags
 	m_bShouldDraw = false;
 	m_bShouldDraw = false;
+	m_bEnableCompatibility = false;
 	
 	//seed random for true random numbers
 	srand(static_cast<unsigned int>(time(nullptr)));
@@ -614,7 +616,10 @@ void Chip8::ExecuteOpcode()
 					m_Memory[m_RegisterIndex + i] = GetRegisterData(i);					
 				}
 
-				m_RegisterIndex += x + 1;
+				if (!m_bEnableCompatibility)
+				{
+					m_RegisterIndex += x + 1;
+				}
 
 				m_MemoryPosition += 2;
 				break;
@@ -630,7 +635,10 @@ void Chip8::ExecuteOpcode()
 					m_Register[i] = m_Memory[m_RegisterIndex + i];
 				}
 
-				m_RegisterIndex += x + 1;
+				if (!m_bEnableCompatibility)
+				{
+					m_RegisterIndex += x + 1;
+				}
 
 				m_MemoryPosition += 2;
 				break;
@@ -687,7 +695,7 @@ void Chip8::LoadGame(const char* filename)
 		m_Memory[i + 512] = buffer[i];
 
 	m_bGameLoaded = true;
-	cout << "Loaded Game: " << filename << "!\n";
+	//cout << "Loaded Game: " << filename << "!\n";
 
 }
 
@@ -699,9 +707,9 @@ void Chip8::PressKey(int keyIndex, U8 pressed)
 void Chip8::IncreaseSpeed()
 {
 	m_RunSpeed++;
-	if(m_RunSpeed > 60)
+	if(m_RunSpeed > 120)
 	{
-		m_RunSpeed = 60;
+		m_RunSpeed = 120;
 	}
 }
 
@@ -713,6 +721,11 @@ void Chip8::ReduceSpeed()
 		m_RunSpeed = 1;
 	}
 
+}
+
+void Chip8::SetCompatibilityMode()
+{
+	m_bEnableCompatibility = !m_bEnableCompatibility;
 }
 
 void Chip8::ClearScreen()
@@ -759,8 +772,6 @@ void Chip8::DrawPixel(U16 x, U16 y, U16 height)
 			m_Screen[pos] ^= 1;
 		}
 	}
-
-
 	//toggle draw flag
 	m_bShouldDraw = true;
 }
