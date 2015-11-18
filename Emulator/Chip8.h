@@ -45,6 +45,9 @@ private:
 	void PrintOpcode();
 	void PrintRegisterValue(int index);
 
+	void ToggleCompatibilityFlags(int hash);
+
+
 	//Chip8 CPU specifics
 	int m_ScreenWidth, m_ScreenHeight;
 	int m_RunSpeed;
@@ -64,7 +67,7 @@ private:
 
 	//flags
 	bool m_bGameLoaded, m_bShouldDraw;
-	bool m_bEnableCompatibility;
+	bool m_bEnableCompatibility, m_bEnableScreenWrap;
 
 };
 

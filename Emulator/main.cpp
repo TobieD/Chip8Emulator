@@ -1,8 +1,11 @@
 #include <iostream>
+#include <sstream>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
 #include "Chip8.h"
-#include <sstream>
+
 
 using namespace std;
 
@@ -206,7 +209,6 @@ int main()
 
 	//5. Create m_chip8 Object and load a game	
 	m_chip8 = new Chip8(CHIP8_WIDTH, CHIP8_HEIGHT,SPEED);
-	m_chip8->Initialize();
 	m_chip8->LoadGame(GAME.c_str());
 
 	// Game loop
@@ -385,7 +387,6 @@ void UpdateTexture(Chip8 * chip8)
 
 void ResetChip8()
 {
-	m_chip8->Initialize();
 	m_chip8->LoadGame(GAME.c_str());
 	UpdateTexture(m_chip8); //clear screen
 }

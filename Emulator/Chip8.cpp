@@ -4,6 +4,8 @@
 #include <chrono> //for random
 #include <sstream>
 
+#include "HashGenerator.h"
+
 //#define LOGREGISTER
 //#define LOGOPCODE
 
@@ -18,7 +20,8 @@ Chip8::Chip8(int screenWidth, int screenHeight,int speed) :
 	m_RegisterIndex(0),
 	m_bGameLoaded(false),
 	m_bShouldDraw(false),
-	m_bEnableCompatibility(false)
+	m_bEnableCompatibility(false),
+	m_bEnableScreenWrap(false)
 {
 
 }
@@ -86,8 +89,8 @@ void Chip8::Initialize()
 
 	//reset flags
 	m_bShouldDraw = false;
-	m_bShouldDraw = false;
-	m_bEnableCompatibility = false;
+	//m_bEnableCompatibility = false;
+	m_bEnableScreenWrap = false;
 	
 	//seed random for true random numbers
 	srand(static_cast<unsigned int>(time(nullptr)));
@@ -124,7 +127,7 @@ void Chip8::Run()
 			//play system beep
 			if (m_SoundTimer == 1)
 			{
-				cout << "\a" << endl; 
+				cout << "\a" << endl; //play system sound
 			}
 
 			m_SoundTimer--;
@@ -171,7 +174,7 @@ void Chip8::ExecuteOpcode()
 
 			case 0x000E: //0x00EE. Return from a subroutine
 			{
-				//return to last position in the stack and reduce the stackindex
+				//return to last position in the stack and reduce the stack index
 				m_StackIndex--;
 				m_MemoryPosition = m_Stack[m_StackIndex];
 				break;
@@ -606,7 +609,7 @@ void Chip8::ExecuteOpcode()
 				break;
 			}
 
-			case 0x0055: //FX55 store m_Registers[0] to m_Registers[X] in memory starting at adress m_RegisterIndex
+			case 0x0055: //FX55 store m_Registers[0] to m_Registers[X] in memory starting at address m_RegisterIndex
 						 //		the value of the I register will be incremented by X + 1. This is due to the changing of addresses by the interpreter.
 			{
 				U8 x = (m_Opcode & 0x0F00) >> 8;
@@ -616,6 +619,7 @@ void Chip8::ExecuteOpcode()
 					m_Memory[m_RegisterIndex + i] = GetRegisterData(i);					
 				}
 
+						
 				if (!m_bEnableCompatibility)
 				{
 					m_RegisterIndex += x + 1;
@@ -625,7 +629,7 @@ void Chip8::ExecuteOpcode()
 				break;
 			}
 
-			case 0x0065: //FX65 fills m_Registers[0] to m_Registers[X] with values in memory starting at adress m_RegisterIndex
+			case 0x0065: //FX65 fills m_Registers[0] to m_Registers[X] with values in memory starting at address m_RegisterIndex
 						 //		the value of the I register will be incremented by X + 1. This is due to the changing of addresses by the interpreter.
 			{
 				U8 x = (m_Opcode & 0x0F00) >> 8;
@@ -633,7 +637,7 @@ void Chip8::ExecuteOpcode()
 				for (int i = 0; i <= x; i++)
 				{
 					m_Register[i] = m_Memory[m_RegisterIndex + i];
-				}
+				}				
 
 				if (!m_bEnableCompatibility)
 				{
@@ -666,9 +670,25 @@ void Chip8::PrintRegisterValue(int index)
 	#endif
 }
 
+void Chip8::ToggleCompatibilityFlags(int hash)
+{
+	
+	m_bEnableScreenWrap = (hash == 1598429529); //Vers Enabled
+	m_bEnableCompatibility = (hash == 348653547); //Connect4 Enabled
+
+}
+
 //Load a binary file in memory
 void Chip8::LoadGame(const char* filename)
 {
+	//remove previous game data
+	Initialize();
+
+
+	string name = string(filename);
+	int index = name.find_last_of(('\\')) + 1;
+	name = name.substr(index);
+
 	//open the file
 	ifstream file(filename, std::ios::binary);
 
@@ -690,9 +710,16 @@ void Chip8::LoadGame(const char* filename)
 	file.read(buffer, size);
 	file.close();
 
+	//Generate hash code and toggle compatibility flags for specific games
+	unsigned int hash = HashGen::Adler(buffer, size);
+	cerr << name << ": " << hash << endl;	
+	ToggleCompatibilityFlags(hash);
+
 	//store it in chip8 memory with an offset of 512 bytes
 	for (int i = 0; i < size; ++i)
+	{
 		m_Memory[i + 512] = buffer[i];
+	}
 
 	m_bGameLoaded = true;
 	//cout << "Loaded Game: " << filename << "!\n";
@@ -736,16 +763,34 @@ void Chip8::ClearScreen()
 
 void Chip8::DrawPixel(U16 x, U16 y, U16 height)
 {
+	//width is always 8 pixels
 	const int width = 8;
 
+
+	m_Register[0xF] = 0;
 	//Access sprite data from memory
 	for (int heightIndex = 0; heightIndex < height; heightIndex++)
 	{
 		//get spriteData for specific pixel in memory
 		U16 spriteData = m_Memory[m_RegisterIndex + heightIndex];
-
+			
 		for (int widthIndex = 0; widthIndex < width; widthIndex++)
 		{
+			
+			int posX = x + widthIndex;
+			int posY = y + heightIndex;
+
+			//Screen warp
+			if (m_bEnableScreenWrap)
+			{
+				posX = posX%m_ScreenWidth;
+				posY = posY%m_ScreenHeight;
+			}
+			else if(posX >= m_ScreenWidth || posY >= m_ScreenHeight)
+			{
+				continue;
+			}
+
 			//evaluate each bit from left to right
 			//This happens because the AND operand, 0x80, gets shifted right on each loop.
 			U8 filter = (0x80 >> widthIndex);
@@ -757,23 +802,24 @@ void Chip8::DrawPixel(U16 x, U16 y, U16 height)
 				continue;
 			}
 
-			//get position of current pixel in the screen Array
-			int pos = (widthIndex + x);
-			pos += (heightIndex + y) * m_ScreenWidth;
-
-			//cout << "Drawing at pixel at " << pos << endl;
-
 			//if flipping from set to unset set carry flag to 1
 			//Collision check
-			m_Register[0xF] = (m_Screen[pos] == 1) ? 1 : 0;
+
+			int pos = posX + (m_ScreenWidth * posY);
+			if (m_Screen[pos] == 1)
+			{
+				m_Register[0xF] = 1;
+			}
 
 			//XOR operation flip from 0000 0000 to 1111 1111 or reverse
 			//this clears the previous drawn pixel in
 			m_Screen[pos] ^= 1;
+
+			//toggle draw flag
+			m_bShouldDraw = true;
 		}
 	}
-	//toggle draw flag
-	m_bShouldDraw = true;
+	
 }
 
 bool Chip8::IsKeyPressed(U8 key)
@@ -787,3 +833,4 @@ U8 Chip8::GetRegisterData(int index)
 	return m_Register[index];
 
 }
+
