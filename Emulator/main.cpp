@@ -1,6 +1,7 @@
 #include <iostream>
 #include <sstream>
 
+//OpenGL includes
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -9,6 +10,7 @@
 
 using namespace std;
 
+//Logger helpers
 class LogBuf: public stringbuf
 {
 protected:
@@ -31,15 +33,16 @@ string GetWindowTitle();
 //Constants	
 #pragma region Constants
 //Window
-const GLuint WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 640;
 const string WINDOW_NAME = "Chip8 Emulator - Devries Tobie";
 
 //Chip8
-const int CHIP8_WIDTH = 64, CHIP8_HEIGHT = 32;
 const float CLEAR_COLOR = 0.0f;
-const int SPEED = 4;
 string GAME = "Resources\\TETRIS";
 bool bInvertColors = false;
+
+const int BLACKCOLOR = 50;
+const int WHITECOLOR = 215;
+const int UPSCALE_FACTOR = 20;
 
 #pragma endregion
 
@@ -66,12 +69,12 @@ const GLchar* fragmentSource =
 "out vec4 outColor;"
 "uniform sampler2D tex;"
 "void main() {"
-"   outColor = texture(tex,TexCoord);"
+"	outColor = texture(tex,TexCoord);"
 "}";
 #pragma endregion 
 
 //Size of Chip8 screen + 3 channels(RGB)
-unsigned char m_screenData[CHIP8_WIDTH*CHIP8_HEIGHT][3];
+unsigned char m_screenData[Chip8::WIDTH*Chip8::HEIGHT][3];
 Chip8* m_chip8;
 GLFWwindow* m_Window;
 
@@ -97,7 +100,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	m_Window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, GetWindowTitle().c_str(), NULL, NULL);
+	m_Window = glfwCreateWindow(Chip8::WIDTH * UPSCALE_FACTOR, Chip8::HEIGHT *UPSCALE_FACTOR, GetWindowTitle().c_str(), NULL, NULL);
 	glfwMakeContextCurrent(m_Window);
 	if (!m_Window)
 	{
@@ -117,7 +120,7 @@ int main()
 	}
 
 	// Define the viewport dimensions
-	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+	glViewport(0, 0, Chip8::WIDTH*UPSCALE_FACTOR, Chip8::HEIGHT*UPSCALE_FACTOR);
 	#pragma endregion 
 	
 	//2. Create Vertex info and index info and bind to buffers
@@ -188,7 +191,7 @@ int main()
 	
 	//4. Create black texture to draw m_chip8 on
 	#pragma region OpenGL Texture Creation
-	for (auto x = 0; x < CHIP8_WIDTH * CHIP8_HEIGHT; x++)
+	for (auto x = 0; x < Chip8::WIDTH * Chip8::HEIGHT; x++)
 		m_screenData[x][0] = m_screenData[x][1] = m_screenData[x][2] = m_screenData[x][3] = 0; 
 
 	//create openGL texture
@@ -196,7 +199,7 @@ int main()
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, CHIP8_WIDTH, CHIP8_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, m_screenData);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Chip8::WIDTH, Chip8::HEIGHT , 0, GL_RGBA, GL_UNSIGNED_BYTE, m_screenData);
 
 	//set to nearest for per pixel
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -208,7 +211,7 @@ int main()
 	#pragma endregion 
 
 	//5. Create m_chip8 Object and load a game	
-	m_chip8 = new Chip8(CHIP8_WIDTH, CHIP8_HEIGHT,SPEED);
+	m_chip8 = new Chip8();
 	m_chip8->LoadGame(GAME.c_str());
 
 	// Game loop
@@ -217,10 +220,13 @@ int main()
 		// Check if any events have been activated (key pressed, mouse moved etc.) and call corresponding response functions
 		glfwPollEvents();
 
-		//Update texture when draw flag is set
-		if(m_chip8->shouldDraw())
+		//Update texture when draw flag is set(optimizes performance)
+		if (m_chip8->shouldDraw())
+		{
 			UpdateTexture(m_chip8);
+		}
 
+		//run chip8 
 		m_chip8->Run();			
 
 		// Render
@@ -228,7 +234,7 @@ int main()
 		glClearColor(CLEAR_COLOR, CLEAR_COLOR, CLEAR_COLOR,1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		//Draw elements
+		//Draw the quad
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 		// Swap the screen buffers
@@ -242,6 +248,7 @@ int main()
 	// Terminates GLFW, clearing any resources allocated by GLFW.
 	glfwTerminate();
 
+	//clean up program
 	glDeleteProgram(shaderProgram);
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
@@ -261,7 +268,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 	//Chip8 keys (0 == released, 1 == Pressed)
 
-
+	//Chip 8 specific input
 	//1, 2 , 3 , C
 	if (key == GLFW_KEY_1 && action == GLFW_RELEASE) m_chip8->PressKey(1, 0);
 	else if (key == GLFW_KEY_2 && action == GLFW_RELEASE) m_chip8->PressKey(2, 0);
@@ -321,34 +328,38 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 
 	//reset current Game
-	if (key == GLFW_KEY_P && action == GLFW_PRESS)
+	if (key == GLFW_KEY_T && action == GLFW_PRESS)
 	{
 		ResetChip8();
 	}
 
+	//Pause 
+	if (key == GLFW_KEY_P && action == GLFW_PRESS)
+	{
+		m_chip8->Pause();
+		glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
+	}
+
+
+	//speed up game
 	if (key == GLFW_KEY_KP_ADD)
 	{
-		m_chip8->IncreaseSpeed();
+		m_chip8->AdjustSpeed(1);
 		glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
 	}
 
-	//Speed up game
-	if (key == GLFW_KEY_KP_SUBTRACT )
+	//Slow down game
+	if (key == GLFW_KEY_KP_SUBTRACT)
 	{
-		m_chip8->ReduceSpeed();
+		m_chip8->AdjustSpeed(-1);
 		glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
 	}
 
-	if(key == GLFW_KEY_I && action == GLFW_PRESS)
+	//Invert colors of the chip8
+	if (key == GLFW_KEY_I && action == GLFW_PRESS)
 	{
 		bInvertColors = !bInvertColors;
 		UpdateTexture(m_chip8);
-	}
-
-	if (key == GLFW_KEY_T  && action == GLFW_PRESS)
-	{
-		m_chip8->SetCompatibilityMode();
-		glfwSetWindowTitle(m_Window, GetWindowTitle().c_str());
 	}
 }
 
@@ -366,11 +377,12 @@ void drop_callback(GLFWwindow* window,int amount, const char** files)
 //Copy the chip8 ScreenData to the openGL texture
 void UpdateTexture(Chip8 * chip8)
 {	
+	const U8* graphics = chip8->GetScreenData();
 	//Set RGB channel of texture
-	for (auto x = 0; x < CHIP8_WIDTH * CHIP8_HEIGHT; x++)
+	for (auto x = 0; x < Chip8::WIDTH * Chip8::HEIGHT; x++)
 	{
-		unsigned char w = 245;
-		unsigned char b = 15;
+		unsigned char w = WHITECOLOR;
+		unsigned char b = BLACKCOLOR;
 
 		if(bInvertColors)
 		{
@@ -379,10 +391,11 @@ void UpdateTexture(Chip8 * chip8)
 			b = t;
 		}
 
-		m_screenData[x][0] = m_screenData[x][1] = m_screenData[x][2] = chip8->m_Screen[x] == 1 ? w : b;
+		m_screenData[x][0] = m_screenData[x][1] = m_screenData[x][2] = graphics[x] == 1 ? w : b;
 	}
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, CHIP8_WIDTH, CHIP8_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, m_screenData);
+	//create the new texture
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Chip8::WIDTH, Chip8::HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, m_screenData);
 }
 
 void ResetChip8()
@@ -393,7 +406,7 @@ void ResetChip8()
 
 string  GetWindowTitle()
 {
-	int speed = (m_chip8)?m_chip8->GetRunSpeed():SPEED;
+	int speed = (m_chip8)?m_chip8->GetRunSpeed():1;
 	int pos = GAME.find_last_of('\\');
 	string mode = "OFF";
 	
@@ -401,6 +414,8 @@ string  GetWindowTitle()
 	{
 		mode = m_chip8->GetCompatibilityMode() ? "ON" : "OFF";
 	}
+
+	string spd = (speed > 0) ?to_string(speed) : "[PAUSED]";
 	
-	return WINDOW_NAME + " - " + GAME.substr(pos + 1) + " - " + to_string(speed) + " [Compatibility mode: " + mode + "]";
+	return WINDOW_NAME + " - " + GAME.substr(pos + 1) + " - " + spd + " [Compatibility mode: " + mode + "]";
 }

@@ -33,7 +33,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Chip8.h" />
-    <ClInclude Include="HashGenerator.h" />
+    <ClInclude Include="Helpers.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9007C103-6E70-4A99-9397-7F9284AADFC1}</ProjectGuid>
